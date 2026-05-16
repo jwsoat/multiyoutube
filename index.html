@@ -1,0 +1,648 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MultiYouTube</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  background: #0f0f0f;
+  color: #fff;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  height: 100vh;
+  overflow: hidden;
+}
+
+#wrapper {
+  display: flex;
+  height: 100vh;
+  width: 100%;
+}
+
+#streams {
+  flex-shrink: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-content: flex-start;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.stream {
+  border: none;
+  background: #000;
+  display: block;
+}
+
+/* Chat sidebar */
+#chatbox {
+  flex: 0 0 340px;
+  display: flex;
+  flex-direction: column;
+  background: #0f0f0f;
+  border-left: 1px solid #272727;
+  overflow: hidden;
+}
+
+#chatbox.hidden { display: none; }
+
+#tablist {
+  display: flex;
+  list-style: none;
+  background: #1a1a1a;
+  border-bottom: 1px solid #272727;
+  overflow-x: auto;
+  flex-shrink: 0;
+}
+
+#tablist::-webkit-scrollbar { height: 3px; }
+#tablist::-webkit-scrollbar-track { background: #1a1a1a; }
+#tablist::-webkit-scrollbar-thumb { background: #444; }
+
+#tablist li a {
+  display: block;
+  padding: 9px 14px;
+  color: #aaa;
+  text-decoration: none;
+  font-size: 12px;
+  white-space: nowrap;
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+}
+
+#tablist li.active a {
+  color: #fff;
+  border-bottom-color: #ff0000;
+}
+
+.stream_chat { display: none; flex: 1; }
+.stream_chat.active { display: block; }
+.stream_chat iframe { width: 100%; height: 100%; border: none; }
+
+/* Help box */
+#helpbox {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: #1a1a1a;
+  border: 1px solid #272727;
+  border-radius: 10px;
+  padding: 36px 40px;
+  max-width: 540px;
+  width: 90%;
+  display: none;
+  z-index: 100;
+  text-align: center;
+}
+
+#helpbox h1 {
+  font-size: 26px;
+  margin-bottom: 8px;
+  letter-spacing: -0.5px;
+}
+
+#helpbox h1 span { color: #ff0000; }
+
+#helpbox p {
+  color: #aaa;
+  line-height: 1.6;
+  font-size: 14px;
+  margin-bottom: 16px;
+}
+
+#helpbox .example-box {
+  background: #0f0f0f;
+  border: 1px solid #2a2a2a;
+  border-radius: 6px;
+  padding: 14px 16px;
+  font-size: 13px;
+  text-align: left;
+  margin-bottom: 20px;
+  color: #ccc;
+  line-height: 2;
+}
+
+#helpbox .example-box code {
+  background: #1a1a1a;
+  border: 1px solid #333;
+  border-radius: 3px;
+  padding: 1px 6px;
+  color: #ff9090;
+  font-family: monospace;
+}
+
+#helpbox .note {
+  font-size: 12px;
+  color: #555;
+  margin-top: 12px;
+}
+
+/* Bottom bar */
+#bottom_bar {
+  position: fixed;
+  bottom: 12px;
+  right: 12px;
+  background: rgba(15,15,15,0.85);
+  border: 1px solid #2a2a2a;
+  border-radius: 6px;
+  padding: 7px 14px;
+  font-size: 13px;
+  z-index: 50;
+  backdrop-filter: blur(8px);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+#bottom_bar a {
+  color: #aaa;
+  cursor: pointer;
+  text-decoration: none;
+  padding: 2px 6px;
+  border-radius: 4px;
+  transition: color 0.15s, background 0.15s;
+}
+
+#bottom_bar a:hover { color: #fff; background: rgba(255,255,255,0.08); }
+#bottom_bar .sep { color: #3a3a3a; padding: 0 2px; }
+
+/* Overlay */
+#overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.65);
+  display: none;
+  z-index: 150;
+}
+#overlay.visible { display: block; }
+
+/* Manage videos dialog */
+#change_videos {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: #1a1a1a;
+  border: 1px solid #2a2a2a;
+  border-radius: 10px;
+  padding: 24px 28px;
+  width: 460px;
+  max-width: 95vw;
+  display: none;
+  z-index: 200;
+}
+
+#change_videos h2 {
+  font-size: 17px;
+  margin-bottom: 18px;
+  font-weight: 600;
+}
+
+#videolist {
+  max-height: 320px;
+  overflow-y: auto;
+  margin-bottom: 16px;
+  padding-right: 2px;
+}
+
+#videolist::-webkit-scrollbar { width: 4px; }
+#videolist::-webkit-scrollbar-track { background: #111; }
+#videolist::-webkit-scrollbar-thumb { background: #444; border-radius: 2px; }
+
+.videolist_item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.videolist_item input[type="checkbox"] {
+  flex-shrink: 0;
+  width: 16px;
+  height: 16px;
+  accent-color: #ff0000;
+  cursor: pointer;
+}
+
+.videolist_item .video_label {
+  flex: 1;
+  font-size: 13px;
+  color: #ccc;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.videolist_item .video_thumb {
+  width: 48px;
+  height: 27px;
+  object-fit: cover;
+  border-radius: 3px;
+  flex-shrink: 0;
+  background: #222;
+}
+
+.videolist_item input[type="text"] {
+  flex: 1;
+  background: #111;
+  border: 1px solid #333;
+  border-radius: 5px;
+  color: #fff;
+  padding: 8px 12px;
+  font-size: 13px;
+  transition: border-color 0.15s;
+}
+
+.videolist_item input[type="text"]:focus {
+  outline: none;
+  border-color: #ff0000;
+}
+
+.videolist_item input[type="text"]::placeholder { color: #444; }
+
+.dialog_footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.btn {
+  padding: 8px 18px;
+  border-radius: 5px;
+  border: none;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 500;
+  transition: background 0.15s, opacity 0.15s;
+}
+
+.btn-ghost {
+  background: transparent;
+  border: 1px solid #333;
+  color: #bbb;
+}
+.btn-ghost:hover { background: #2a2a2a; color: #fff; }
+
+.btn-primary {
+  background: #ff0000;
+  color: #fff;
+}
+.btn-primary:hover { background: #cc0000; }
+
+.btn-add {
+  background: transparent;
+  border: 1px solid #333;
+  color: #aaa;
+  padding: 8px 14px;
+}
+.btn-add:hover { border-color: #555; color: #fff; }
+
+/* Toast */
+#toast {
+  position: fixed;
+  bottom: 50px;
+  right: 16px;
+  background: #222;
+  border: 1px solid #333;
+  border-radius: 6px;
+  padding: 8px 16px;
+  font-size: 13px;
+  color: #ccc;
+  z-index: 300;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s;
+}
+#toast.show { opacity: 1; }
+</style>
+</head>
+<body>
+
+<div id="wrapper">
+  <div id="streams"></div>
+  <div id="chatbox" class="hidden">
+    <ul id="tablist"></ul>
+  </div>
+</div>
+
+<div id="helpbox">
+  <h1><span>Multi</span>YouTube</h1>
+  <p>Watch multiple YouTube videos side-by-side. Paste video IDs, short links, or full YouTube URLs.</p>
+  <div class="example-box">
+    Video ID: <code>dQw4w9WgXcQ</code><br>
+    Short URL: <code>https://youtu.be/dQw4w9WgXcQ</code><br>
+    Watch URL: <code>https://youtube.com/watch?v=dQw4w9WgXcQ</code><br>
+    Live stream: <code>https://youtube.com/live/dQw4w9WgXcQ</code>
+  </div>
+  <button class="btn btn-primary" style="padding:10px 28px;font-size:14px;" onclick="openChangeVideos()">Add Videos</button>
+  <p class="note">The URL updates automatically — bookmark or share it to restore your layout.</p>
+</div>
+
+<div id="overlay" onclick="closeChangeVideos(false)"></div>
+
+<div id="change_videos">
+  <h2>Manage Videos</h2>
+  <div id="videolist"></div>
+  <div class="dialog_footer">
+    <button class="btn btn-add" onclick="addVideoItem()">+ Add another</button>
+    <div style="display:flex;gap:8px;">
+      <button class="btn btn-ghost" onclick="closeChangeVideos(false)">Cancel</button>
+      <button class="btn btn-primary" onclick="closeChangeVideos(true)">Apply</button>
+    </div>
+  </div>
+</div>
+
+<div id="bottom_bar">
+  <a onclick="openChangeVideos()">Manage Videos</a>
+  <span class="sep">|</span>
+  <a onclick="toggleChat()">Toggle Chat</a>
+  <span class="sep">|</span>
+  <a onclick="copyLink()" id="copy_link_btn">Copy Link</a>
+</div>
+
+<div id="toast"></div>
+
+<script>
+let videos = [];
+let chatHidden = true;
+let activeTab = 0;
+
+// ── YouTube ID extraction ─────────────────────────────────────────────────────
+function extractVideoId(raw) {
+  const input = (raw || '').trim();
+  if (!input) return null;
+  try {
+    const url = new URL(input.includes('://') ? input : 'https://' + input);
+    const host = url.hostname.replace(/^www\./, '');
+    if (host === 'youtu.be') {
+      return url.pathname.slice(1).split('?')[0] || null;
+    }
+    if (host === 'youtube.com' || host === 'youtube-nocookie.com') {
+      if (url.searchParams.has('v')) return url.searchParams.get('v');
+      const parts = url.pathname.split('/').filter(Boolean);
+      if (['live', 'shorts', 'embed', 'v'].includes(parts[0]) && parts[1])
+        return parts[1].split('?')[0];
+    }
+  } catch (_) {}
+  if (/^[a-zA-Z0-9_-]{11}$/.test(input)) return input;
+  return null;
+}
+
+// ── Layout optimiser (same algorithm as multitwitch) ─────────────────────────
+function optimizeSize() {
+  const n = videos.length;
+  const streamsEl = document.getElementById('streams');
+  const chatEl = document.getElementById('chatbox');
+
+  if (n === 0) return;
+
+  const totalH = window.innerHeight;
+  const totalW = document.getElementById('wrapper').clientWidth;
+  const chatW = chatHidden ? 0 : 340;
+  const availW = totalW - chatW;
+
+  streamsEl.style.width = availW + 'px';
+  if (!chatHidden) chatEl.style.height = totalH + 'px';
+
+  const ratio = 16 / 9;
+  let bestW = 0, bestH = 0, bestPad = 0;
+
+  for (let perRow = 1; perRow <= n; perRow++) {
+    const rows = Math.ceil(n / perRow);
+    let w = Math.floor(availW / perRow) - 4;
+    let h = Math.floor(totalH / rows) - 4;
+    if (w / ratio < h) { h = w / ratio; } else { w = h * ratio; }
+    if (w > bestW) {
+      bestW = w; bestH = h;
+      bestPad = (totalH - rows * (Math.floor(h) + 4)) / 2;
+    }
+  }
+
+  streamsEl.style.paddingTop = Math.max(0, bestPad) + 'px';
+  document.querySelectorAll('.stream').forEach(el => {
+    el.style.width  = Math.floor(bestW) + 'px';
+    el.style.height = Math.floor(bestH) + 'px';
+  });
+}
+
+// ── Render ────────────────────────────────────────────────────────────────────
+function renderStreams() {
+  const streamsEl  = document.getElementById('streams');
+  const tablistEl  = document.getElementById('tablist');
+  const chatboxEl  = document.getElementById('chatbox');
+  const helpbox    = document.getElementById('helpbox');
+
+  streamsEl.innerHTML = '';
+  tablistEl.innerHTML = '';
+  document.querySelectorAll('.stream_chat').forEach(el => el.remove());
+
+  if (videos.length === 0) {
+    helpbox.style.display = 'block';
+    if (!chatHidden) toggleChat();
+    return;
+  }
+
+  helpbox.style.display = 'none';
+
+  const embedDomain = location.hostname || 'localhost';
+
+  videos.forEach((id, i) => {
+    // Video iframe
+    const iframe = document.createElement('iframe');
+    iframe.className = 'stream';
+    iframe.src = `https://www.youtube-nocookie.com/embed/${id}?rel=0&modestbranding=1`;
+    iframe.setAttribute('allowfullscreen', '');
+    iframe.allow = 'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share';
+    streamsEl.appendChild(iframe);
+
+    // Chat tab
+    const li = document.createElement('li');
+    li.dataset.index = i;
+    if (i === activeTab) li.classList.add('active');
+    const a = document.createElement('a');
+    a.textContent = id;
+    a.onclick = () => switchTab(i);
+    li.appendChild(a);
+    tablistEl.appendChild(li);
+
+    // Chat panel
+    const chatDiv = document.createElement('div');
+    chatDiv.className = 'stream_chat' + (i === activeTab ? ' active' : '');
+    chatDiv.id = `chat-${id}`;
+    const chatFrame = document.createElement('iframe');
+    chatFrame.src = `https://www.youtube.com/live_chat?v=${id}&embed_domain=${embedDomain}`;
+    chatFrame.frameBorder = '0';
+    chatDiv.appendChild(chatFrame);
+    chatboxEl.appendChild(chatDiv);
+  });
+
+  optimizeSize();
+}
+
+function switchTab(i) {
+  activeTab = i;
+  document.querySelectorAll('#tablist li').forEach((li, idx) =>
+    li.classList.toggle('active', idx === i));
+  document.querySelectorAll('.stream_chat').forEach((div, idx) =>
+    div.classList.toggle('active', idx === i));
+}
+
+// ── Chat toggle ───────────────────────────────────────────────────────────────
+function toggleChat() {
+  chatHidden = !chatHidden;
+  document.getElementById('chatbox').classList.toggle('hidden', chatHidden);
+  optimizeSize();
+}
+
+// ── Hash routing ──────────────────────────────────────────────────────────────
+function getVideosFromHash() {
+  const hash = decodeURIComponent(location.hash.slice(1));
+  if (!hash) return [];
+  return hash.split('/').map(extractVideoId).filter(Boolean);
+}
+
+function updateHash() {
+  history.replaceState(null, '', '#' + videos.join('/'));
+}
+
+// ── Manage videos dialog ──────────────────────────────────────────────────────
+function makeInputItem() {
+  const div = document.createElement('div');
+  div.className = 'videolist_item';
+  const input = document.createElement('input');
+  input.type = 'text';
+  input.className = 'video_input';
+  input.placeholder = 'Video ID or YouTube URL…';
+  input.onkeydown = e => { if (e.key === 'Enter') { e.preventDefault(); addVideoItem(); } };
+  div.appendChild(input);
+  return div;
+}
+
+function makeExistingItem(id) {
+  const div = document.createElement('div');
+  div.className = 'videolist_item';
+
+  const cb = document.createElement('input');
+  cb.type = 'checkbox';
+  cb.className = 'check';
+  cb.checked = true;
+
+  const thumb = document.createElement('img');
+  thumb.className = 'video_thumb';
+  thumb.src = `https://img.youtube.com/vi/${id}/default.jpg`;
+  thumb.alt = '';
+
+  const label = document.createElement('span');
+  label.className = 'video_label';
+  label.textContent = id;
+
+  div.append(cb, thumb, label);
+  return div;
+}
+
+function populateVideoList() {
+  const list = document.getElementById('videolist');
+  list.innerHTML = '';
+  videos.forEach(id => list.appendChild(makeExistingItem(id)));
+  list.appendChild(makeInputItem());
+  const inputs = list.querySelectorAll('.video_input');
+  if (inputs.length) inputs[inputs.length - 1].focus();
+}
+
+function addVideoItem() {
+  const list = document.getElementById('videolist');
+  list.appendChild(makeInputItem());
+  const inputs = list.querySelectorAll('.video_input');
+  if (inputs.length) inputs[inputs.length - 1].focus();
+}
+
+function openChangeVideos() {
+  document.getElementById('helpbox').style.display = 'none';
+  populateVideoList();
+  document.getElementById('change_videos').style.display = 'block';
+  document.getElementById('overlay').classList.add('visible');
+}
+
+function closeChangeVideos(apply) {
+  if (apply) {
+    const newVideos = [];
+    const checks = document.querySelectorAll('#videolist .check');
+    videos.forEach((id, i) => {
+      if (checks[i] && checks[i].checked) newVideos.push(id);
+    });
+    document.querySelectorAll('#videolist .video_input').forEach(input => {
+      const id = extractVideoId(input.value);
+      if (id && !newVideos.includes(id)) newVideos.push(id);
+    });
+    videos = newVideos;
+    activeTab = 0;
+    updateHash();
+    renderStreams();
+  }
+
+  document.getElementById('change_videos').style.display = 'none';
+  document.getElementById('overlay').classList.remove('visible');
+
+  if (videos.length === 0) {
+    document.getElementById('helpbox').style.display = 'block';
+  }
+}
+
+// ── Copy link ─────────────────────────────────────────────────────────────────
+function showToast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  clearTimeout(el._t);
+  el._t = setTimeout(() => el.classList.remove('show'), 2200);
+}
+
+function copyLink() {
+  const url = location.href;
+  navigator.clipboard.writeText(url).then(
+    () => showToast('Link copied to clipboard'),
+    () => { prompt('Copy this link:', url); }
+  );
+}
+
+// ── Global paste shortcut ─────────────────────────────────────────────────────
+document.addEventListener('paste', e => {
+  if (document.activeElement && document.activeElement.tagName === 'INPUT') return;
+  const text = (e.clipboardData || window.clipboardData).getData('text');
+  const id = extractVideoId(text);
+  if (id && !videos.includes(id)) {
+    videos.push(id);
+    updateHash();
+    renderStreams();
+    showToast(`Added: ${id}`);
+  }
+});
+
+// ── Keyboard shortcut: Escape closes dialog ───────────────────────────────────
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') closeChangeVideos(false);
+});
+
+// ── Resize ────────────────────────────────────────────────────────────────────
+window.addEventListener('resize', optimizeSize);
+
+// ── Hash changes (back/forward navigation) ────────────────────────────────────
+window.addEventListener('hashchange', () => {
+  videos = getVideosFromHash();
+  activeTab = 0;
+  renderStreams();
+});
+
+// ── Init ──────────────────────────────────────────────────────────────────────
+videos = getVideosFromHash();
+if (videos.length === 0) {
+  document.getElementById('helpbox').style.display = 'block';
+} else {
+  renderStreams();
+}
+</script>
+</body>
+</html>
